@@ -1,0 +1,9 @@
+The first line has 2 numbers separated by a comma. The first number is the number of columns and the second number is the number of rows.
+Then there is a newline.
+Every line following the newline represents a column. The first following line represents the leftmost column.
+When a line has multiple comma-separated numbers, each number represents one number on the column.
+The first number represents the topmost value for the column.
+Then there is a newline.
+Every line following this second newline represents a row. The first following line represents the topmost row.
+When a line has multiple comma-separated numbers, each number represents one number on the row.
+The first number represents the leftmost value for the row.
