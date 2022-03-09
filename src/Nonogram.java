@@ -226,6 +226,7 @@ public class Nonogram {
 
         String[] crState = Arrays.copyOf(crStateArr, crStateArr.length);
 
+        // TODO add case for if there is a filledIn next to a crossedOut but it isn't fully solved.
         if (cr.length == 1 && cr[0] == 0 && !allElemAreVal(crState, crossedOut, 0, crState.length)) { // Row of 0
             System.out.println("Row of 0");
             Arrays.fill(crState, crossedOut);
@@ -237,6 +238,7 @@ public class Nonogram {
             for (int i = crState.length - num; i < num; i++) {
                 crState[i] = filledIn;
             }
+            if (colOrRowIsFullySolved(cr, crState) && arrContains(crState, " ", 0, crState.length)) { setBlankToCrossedOut(crState); }
             return crState;
         } else if (sumIntArr(cr) + cr.length - 1 == crState.length) { // fully filled out cr
             System.out.println("Full CR Row");
@@ -272,18 +274,24 @@ public class Nonogram {
                 }
             }
             int existingWidth = rightFilledIndex - leftFilledIndex + 1;
-            for (int i = leftFilledIndex - 1; i >= (Math.max(leftFilledIndex - existingWidth, 0)); i--) {
+            leftCrossedIndex = rightFilledIndex - cr[0];
+            rightCrossedIndex = leftFilledIndex + cr[0];
+            for (int i = leftFilledIndex - 1; i >= (Math.max(rightFilledIndex - existingWidth, 0)); i--) {
                 if (crState[i].equals(crossedOut)) {
                     leftCrossedIndex = i;
                     break;
                 }
             }
-            for (int i = rightFilledIndex + 1; i < (Math.min(rightFilledIndex + existingWidth + 1, crState.length)); i++) {
+            for (int i = rightFilledIndex + 1; i < (Math.min(leftFilledIndex + existingWidth + 1, crState.length)); i++) {
                 if (crState[i].equals(crossedOut)) {
                     rightCrossedIndex = i;
                     break;
                 }
             }
+
+            System.out.println("Existing width is " + existingWidth);
+            System.out.println("Left and right filled indices are " + leftFilledIndex + " and " + rightFilledIndex);
+            System.out.println("Left and right crossed indices are " + leftCrossedIndex + " and " + rightCrossedIndex);
 
             // fill in the crosses
             for (int i = 0; i <= leftCrossedIndex; i++) {
@@ -306,179 +314,38 @@ public class Nonogram {
                     crState[i] = filledIn;
                 }
             }
+            if (colOrRowIsFullySolved(cr, crState) && arrContains(crState, " ", 0, crState.length)) { setBlankToCrossedOut(crState); }
             return crState;
         } else {
             System.out.println("Base case");
             /*
-            Base case: Find leftmost/topmost possible config,
-            Find rightmost/bottommost possible config,
-            Identify what Os and Xs are shared between the two (that are within the same cr numbers (O) or between the same cr numbers (X))
-            Populate the crState with those shared values
+            Base case: Loop through each unsolved index in crState
+            For each one, check if it must be X or it must be O
+                It must be X if putting O makes it unsolvable
+                It must be O if putting X makes it unsolvable
+            For reference, X is crossedOut, O (capital letter O) is filledIn
              */
-            String[] firstMost = new String[crState.length];
-            String[] lastMost = new String[crState.length];
-            Arrays.fill(firstMost, crossedOut);
-            Arrays.fill(lastMost, crossedOut);
-            int fmIndex = 0; // firstMost Index
-            int lmIndex = crState.length; // lastMost Index
-            boolean filledInt;
-
-            // for each num in cr, try adding to firstMost
-            for (Integer i : cr) { // for each num in cr, try to add that to firstMost
-                filledInt = false;
-
-                // Find first index in crState where we can add i to firstMost, starting at fmIndex
-                while (fmIndex < crState.length) {
-//                    System.out.println("fmIndex is " + fmIndex + " and arrcontains returns " + arrContains(crState, crossedOut, fmIndex, fmIndex + i));
-                    if (!arrContains(crState, crossedOut, fmIndex, fmIndex + i) && (fmIndex + i >= crState.length || !crState[fmIndex + i].equals(filledIn))) {
-                        System.out.println("found place to add to firstMost");
-                        // If the consecutive points starting at fmIndex does not have crossedOut and the point after the consecutive line is not filledIn
-                        // Then add to firstMost
-                        for (int j = fmIndex; j < fmIndex + i; j++) {
-                            firstMost[j] = filledIn;
-                        }
-                        if (fmIndex + i < firstMost.length) { firstMost[fmIndex + i] = crossedOut; }
-                        fmIndex += (i + 1); //increment fmIndex by length of consecutive line plus 1 for the crossed out block at end
-                        filledInt = true;
-                        break; // move to next Integer in cr
-                    } else {
-                        if ( arrContains(crState, crossedOut, fmIndex, fmIndex + i) ) {
-                            System.out.println("found cross in middle");
-                            // Found crossed out in middle
-                            // move up so that fmIndex is one after the crossed out
-                            int newIndex = findFirst(crState, crossedOut, fmIndex, fmIndex + i);
-                            if (newIndex == -1) {
-                                System.out.println("arr contains cross but couldn't find cross index, firstmost");
-                                System.exit(1);
-                            }
-                            fmIndex = newIndex + 1;
-                        } else {
-                            System.out.println("move up one");
-                            // move up one
-                            // covers "filledin at end" and default case
-//                            firstMost[fmIndex] = crossedOut;
-                            fmIndex++;
-                        }
+            for (int i = 0; i < crState.length; i++) {
+                if (crState[i].equals(" ")) {
+                    // Check must be X
+                    crState[i] = filledIn;
+                    if (!isSolvable(cr, crState)) {
+                        crState[i] = crossedOut;
+                        continue;
                     }
-                }
-                if (fmIndex >= crState.length && !filledInt) {
-                    // if fmIndex at end of array and we didn't fill anything in this loop,
-                    // Could not create firstmost, which would mean that crState is unsolvable.
-                    System.out.println("Could not create firstMost for Integer " + i);
-                    printArr(firstMost);
-                    System.exit(0);
+                    // Check must be O
+                    crState[i] = crossedOut;
+                    if (!isSolvable(cr, crState)) {
+                        crState[i] = filledIn;
+                        continue;
+                    }
+                    crState[i] = " ";
                 }
             }
-
-            // for each num in cr backwards, try adding to lastMost
-            for (int i = cr.length - 1; i >= 0; i--) { // for each num in cr from the end, try to add that to lastMost
-                int num = cr[i];
-                filledInt = false;
-                // Unlike firstMost, lastMost represents one after the rightmost index of the consecutive points we fill in
-                // We move through the array right to left, or back to front
-
-                // Find last index in crState where we can add i to lastMost, starting at lmIndex
-                while (lmIndex >= 0) {
-                    if (!arrContains(crState, crossedOut, lmIndex - num, lmIndex) && (lmIndex - num <= 0 || !crState[lmIndex - num - 1].equals(filledIn))) {
-                        // If no crossedOut in consecutive points starting at lmIndex and point before lmIndex is not filledIn
-                        // Then add to lastMost
-                        for (int j = lmIndex - 1; j > lmIndex - num - 1; j--) {
-                            lastMost[j] = filledIn;
-                        }
-                        if ( lmIndex - num - 1 >= 0) {
-                            lastMost[lmIndex - num - 1] = crossedOut;
-                        }
-                        lmIndex -= (num + 1);
-                        filledInt = true;
-                        break;
-                    } else {
-                        if ( arrContains(crState, crossedOut, lmIndex - num, lmIndex) ) {
-                            //Found crossed out in middle
-                            int newIndex = findFirst(crState, crossedOut, lmIndex - num, lmIndex);
-                            if (newIndex == -1) {
-                                System.out.println("arr contains cross but couldn't find cross index, lastmost");
-                                System.exit(1);
-                            }
-                            lmIndex = newIndex;
-                        } else {
-                            // move down one
-                            // covers "filledin at beginning" and default case
-//                            lastMost[lmIndex] = crossedOut;
-                            lmIndex--;
-                        }
-                    }
-                }
-                if (lmIndex <= 0 && !filledInt) {
-                    // fmIndex reached start of array and we didn't fill anything in this loop
-                    // Couldn't create lastmost, which would mean that crState is unsolvable
-                    System.out.println("Could not create lastMost for Integer " + num);
-                    printArr(lastMost);
-                    System.exit(1);
-                }
-            }
-
-            System.out.println("Firstmost and lastmost are ");
-            printArr(firstMost);
-            printArr(lastMost);
-
-            fmIndex = 0; // Repurpose var to loop through firstMost from the beginning
-            lmIndex = 0; // Repurpose var to loop through lastMost from the beginning
-            if (!firstMost[fmIndex].equals(lastMost[lmIndex])) {
-                // if they don't point to the same string, then fmIndex points to filledIn and lmIndex points to crossedOut
-                // because I think it's impossible for the opposite to be true, as far as I can tell
-                while (lmIndex < lastMost.length) {
-                    if (lastMost[lmIndex].equals(filledIn)) {
-                        break;
-                    }
-                    lmIndex++;
-                }
-            }
-
-            /*
-               loop through firstmost and lastmost, find consecutive groups with overlapping letters, and populate those in crState
-               e.g. if firstmost and lastmost are OOOXX and XXOOO respectively, they overlap on index 2, so crState[2] = O
-               but on the other hand, if firstmost and lastmost are OXOXX and XXOXO,
-               they have no overlap, even though index 2 is O for both,
-               because index 2 in firstmost is the second group of O,
-               and index 2 in lastmost is the first group of O
-             */
-
-            while (fmIndex < firstMost.length && lmIndex < lastMost.length) {
-                if (!firstMost[fmIndex].equals(lastMost[lmIndex])) {
-                    System.out.println("fm and lm index point to different values when comparing overlaps");
-                    System.exit(1);
-                }
-
-                // Indices of the first element after fm/lm index that is different from fm/lm index
-                // Or end of firstmost/lastmost array
-                int fmEndIndex = fmIndex;
-                int lmEndIndex = lmIndex; // the index of the first
-                while (fmEndIndex < firstMost.length) {
-                    if (!firstMost[fmIndex].equals(firstMost[fmEndIndex])) {
-                        break;
-                    }
-                    fmEndIndex++;
-                }
-                while (lmEndIndex < lastMost.length) {
-                    if (!lastMost[lmIndex].equals(lastMost[lmEndIndex])) {
-                        break;
-                    }
-                    lmEndIndex++;
-                }
-
-                // compare fmEndIndex to lmIndex
-                if (lmIndex < fmEndIndex) {
-                    for (int i = lmIndex; i < fmEndIndex; i++) {
-                        crState[i] = firstMost[i];
-                    }
-                }
-                fmIndex = fmEndIndex;
-                lmIndex = lmEndIndex;
-            }
+            // Return crState if it is different from crStateArr, otherwise return empty array
+            if (colOrRowIsFullySolved(cr, crState) && arrContains(crState, " ", 0, crState.length)) { setBlankToCrossedOut(crState); }
+            return (Arrays.compare(crState, crStateArr) == 0) ? new String[0] : crState;
         }
-
-
-        return (Arrays.compare(crState, crStateArr) == 0) ? new String[0] : crState;
     }
 
     /**
@@ -696,5 +563,131 @@ public class Nonogram {
             }
         }
         return sum;
+    }
+
+    private static int getArrValOrDefault (int[] arr, int ind, int def) {
+        if (ind >= 0 && ind < arr.length) {
+            return arr[ind];
+        } else {
+            return def;
+        }
+    }
+
+    // Crosses out everything that's not filledIn or crossedOut. Useful for finishing a col or row after all the filledIn is added
+    private static void setBlankToCrossedOut(String[] crState) {
+        for (int i = 0; i < crState.length; i++) {
+            if (!crState[i].equals(filledIn) && !crState[i].equals(crossedOut)) {
+                crState[i] = crossedOut;
+            }
+        }
+    }
+
+    /**
+     * Returns whether or not crState can be solved, meaning it has at least one solution, as defined by cr
+     * Does not modify cr or crState
+     * @param cr int array describing the row or col
+     * @param crState string array describing the current known values
+     * @return true if we can make a solution from crState, false otherwise.
+     */
+    public static boolean isSolvable(int[] cr, String[] crState) {
+        int[] crPosition = new int[cr.length]; // each int in this array is the leftmost index of where the number in same index in cr starts in crState, meaning crPosition values is index for crState
+        int firstOpenIndex = 0; // index of first place in crState that is open
+        while (firstOpenIndex < crState.length && crState[firstOpenIndex].equals(crossedOut)) { firstOpenIndex++; }
+
+        // Loop through crState from beginning, adding cr as soon as possible.
+        //      If some cr cannot be added, unsolvable, return false
+        // After adding cr, loop through cr backwards
+        //      For each cr, if there is a filledIn after the end of last known cr,
+        //      We move the last cr up to include that filled In (placing the cr as late as possible,
+        //      And move all previous cr up as needed
+
+        for (int i = 0; i < cr.length; i++) {
+            if (firstOpenIndex >= crState.length || firstOpenIndex + cr[i] > crState.length) {
+                System.out.println("Could not find space for current i, unsolvable");
+                return false;
+            }
+            // for each cr, find the best place to add it to crState
+
+            // if no crossedOut in current possible area and filledIn is not right after current possible area,
+            // then set crPosition for this i to firstOpenIndex and move firstOpenIndex past possible area (including crossedOut at end if applicable)
+            if (!arrContains(crState, crossedOut, firstOpenIndex, firstOpenIndex + cr[i]) && (firstOpenIndex + cr[i] >= crState.length || !crState[firstOpenIndex + cr[i]].equals(filledIn))) {
+                crPosition[i] = firstOpenIndex;
+                firstOpenIndex += (cr[i] + 1);
+            } else if (arrContains(crState, crossedOut, firstOpenIndex, firstOpenIndex + i)) {
+                // if there is crossedOut in current possible area, move firstOpenIndex past the crossedOut
+                firstOpenIndex = findFirst(crState, crossedOut, firstOpenIndex, firstOpenIndex + i) + 1;
+                i--; // decrement so we can try to place this cr again
+            } else {
+                // filledIn at end, most up one
+                firstOpenIndex++;
+                i--; // decrement so we can try to place this cr again
+            }
+        } // Finished making crPosition with earliest possible places
+
+        System.out.println("crPosition are " + intArrString(crPosition, ","));
+
+        while (arrContains(crState, filledIn, crPosition[crPosition.length - 1] + cr[crPosition.length - 1], crState.length)) { // While there is filledIn after last filledIn defined by crPosition,
+            int filledInToMoveToIndex = findFirst(crState, filledIn, crPosition[crPosition.length - 1] + cr[crPosition.length - 1], crState.length); // get the filledIn from previous step to move to
+            int currCRIndex = crPosition.length - 1; // crPosition[] index we're currently moving
+            System.out.println("FilledIn at " + filledInToMoveToIndex + " when searching between " + (crPosition[crPosition.length - 1] + cr[crPosition.length - 1]) + " and " + crState.length);
+            System.out.println("Currently moving cr at " + crPosition[currCRIndex] + " to cover filledIn at " + filledInToMoveToIndex);
+            while (filledInToMoveToIndex >= 0 && filledInToMoveToIndex < crState.length) { // while the filledIn index is within crState,
+                int newFilledInIndex = findFirst(crState, filledIn, crPosition[currCRIndex], crPosition[currCRIndex] + cr[currCRIndex]); // index of first filledIn already covered by currCRIndex, or -1 if none
+                System.out.println("Current cr has filledIn at " + newFilledInIndex);
+
+                // To find the new end index,
+                // We get the firstFilledIn,
+                // Move past the consecutive filledIn group if any,
+                // Then move it to the latest index in crState where we think we can still put this cr
+                // Once newEndIndex is calculated, the start index is just cr amount in front of it
+                int newEndIndex = filledInToMoveToIndex;
+                while (newEndIndex < crState.length && crState[newEndIndex].equals(filledIn)) { newEndIndex++; }
+                while (
+                        newEndIndex < crState.length // newEndIndex is not at end of array
+                                && newEndIndex < filledInToMoveToIndex + cr[currCRIndex] // newEndIndex is within current consecutive points
+                                && !crState[newEndIndex].equals(crossedOut) // newEndIndex is not crossedOut
+                                && (newEndIndex + 1 >= crState.length || !crState[newEndIndex + 1].equals(filledIn)) // if newEndIndex + 1 within array, then newEndIndex + 1 is not filledIn
+                ) {
+                    newEndIndex++;
+                } // finished getting the newEndIndex
+                System.out.println("Checking newEndIndex conditions: not end of array? " + (newEndIndex-1 < crState.length) + " - within current consecutive points? " + (newEndIndex-1 < crPosition[currCRIndex] + cr[currCRIndex]) + " - is crossed out? " + !crState[newEndIndex-1].equals(crossedOut) + " - if next exists, it's not filledIn? " + (newEndIndex >= crState.length || !crState[newEndIndex].equals(filledIn)));
+                System.out.println("New end index is " + newEndIndex);
+                if (arrContains(crState, crossedOut, newEndIndex - cr[currCRIndex], newEndIndex)) {
+                    // unable to add cr to this space, unsolvable
+                    System.out.println("Unable to solve, crossedOut found at " + findFirst(crState, crossedOut, newEndIndex - cr[currCRIndex], newEndIndex));
+                    return false;
+                } else {
+                    crPosition[currCRIndex] = newEndIndex - cr[currCRIndex]; // move up position
+                    currCRIndex--; // move up currCRIndex
+                    filledInToMoveToIndex = newFilledInIndex; // update new FilledIn that we want to move currCRIndex to, if this is not valid
+                    if (currCRIndex < 0 && filledInToMoveToIndex > -1) {
+                        // everything moved up but there was still something to cover, so unsolvable
+                        return false;
+                    }
+                    if (currCRIndex >= 0) {
+                        System.out.println("cr moved up to " + crPosition[currCRIndex + 1] + ", preparing to see if we can move cr " + cr[currCRIndex] + " at " + crPosition[currCRIndex] + " to include filledIn " + filledInToMoveToIndex);
+                    } else {
+                        System.out.println("currCRIndex is " + currCRIndex + ", already moved everything up, filledInIndex is " + filledInToMoveToIndex);
+                    }
+                }
+            }
+        }
+        // Check that crPosition and crState define a valid crState
+        Set<Integer> filledInSet = new HashSet<Integer>();
+        for (int i = 0; i < cr.length; i++) {
+            for (int j = crPosition[i]; j < crPosition[i] + cr[i]; j++) {
+                filledInSet.add(j);
+            }
+        }
+        for (int i = 0; i < crState.length; i++) {
+            if (filledInSet.contains(i) && crState[i].equals(crossedOut)) {
+                // if i should be filledIn but it is crossedOut
+                return false;
+            } else if (!filledInSet.contains(i) && crState[i].equals(filledIn)) {
+                // if i should be not be filledIn but it is
+                return false;
+            }
+        }
+        return true;
     }
 }
